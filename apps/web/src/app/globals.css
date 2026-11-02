@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Deep violet + coral theme */
+    --primary: 263 69% 42%; /* #5B21B6 */
+    --primary-hover: 263 67% 35%; /* #4C1D95 */
+    --primary-light: 251 91% 95%; /* #EDE9FE */
+    --primary-foreground: 0 0% 100%;
+    --accent: 0 100% 71%; /* #FF6B6B */
+    --accent-foreground: 0 0% 100%;
+    --success: 160 84% 39%; /* #10B981 */
+    --background: 240 33% 99%; /* #FAFAFC */
+    --foreground: 250 26% 14%; /* #1E1B2E */
+    --card: 0 0% 100%;
+    --card-foreground: 250 26% 14%;
+    --muted: 250 20% 96%;
+    --muted-foreground: 250 10% 46%;
+    --border: 250 18% 90%;
+    --input: 250 18% 88%;
+    --ring: 263 69% 42%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --sidebar: 266 52% 13%; /* #1E1033 */
+    --sidebar-foreground: 250 60% 96%;
+    --sidebar-muted: 263 30% 70%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer components {
+  .gradient-text {
+    @apply bg-gradient-to-r from-violet-800 via-violet-600 to-coral-500 bg-clip-text text-transparent;
+  }
+
+  .hero-glow {
+    background:
+      radial-gradient(60% 50% at 20% 10%, rgba(124, 58, 237, 0.18), transparent 70%),
+      radial-gradient(40% 40% at 85% 20%, rgba(255, 107, 107, 0.16), transparent 70%);
+  }
+
+  .chat-pattern {
+    background-color: #f6f4fb;
+    background-image: radial-gradient(rgba(91, 33, 182, 0.07) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-violet-200;
+  }
+}

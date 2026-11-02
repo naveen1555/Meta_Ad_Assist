@@ -1,0 +1,440 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  AGENT
+}
+
+enum ChannelType {
+  WHATSAPP
+  MESSENGER
+  INSTAGRAM
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String?
+  googleId     String?  @unique
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+
+  memberships   Member[]
+  assigned      Conversation[] @relation("assignee")
+  sentMessages  Message[]      @relation("sender")
+}
+
+model Workspace {
+  id              String   @id @default(cuid())
+  name            String
+  plan            String   @default("free")
+  timezone        String   @default("Asia/Kolkata")
+  leadSettings    Json?
+  roundRobinIndex Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  members       Member[]
+  invites       Invite[]
+  channels      Channel[]
+  contacts      Contact[]
+  conversations Conversation[]
+  messages      Message[]
+  templates     Template[]
+  broadcasts    Broadcast[]
+  flows         Flow[]
+  flowRuns      FlowRun[]
+  leads         Lead[]
+  integrations  Integration[]
+  apiKeys       ApiKey[]
+  subscription  Subscription?
+  usage         Usage[]
+  quickReplies  QuickReply[]
+  customFields  CustomField[]
+  activities    Activity[]
+}
+
+model Member {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        Role     @default(AGENT)
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  workspaceId String
+  email       String
+  role        Role      @default(AGENT)
+  token       String    @unique
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Channel {
+  id          String      @id @default(cuid())
+  workspaceId String
+  type        ChannelType
+  name        String
+  /// WhatsApp phone number id, Facebook page id or Instagram account id
+  externalId  String
+  wabaId      String?
+  pageId      String?
+  phoneNumber String?
+  accessToken String
+  status      String      @default("active")
+  createdAt   DateTime    @default(now())
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  templates     Template[]
+  broadcasts    Broadcast[]
+
+  @@unique([type, externalId])
+}
+
+model Contact {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  name         String?
+  phone        String?
+  email        String?
+  messengerId  String?
+  instagramId  String?
+  tags         String[]  @default([])
+  customFields Json      @default("{}")
+  optIn        Boolean   @default(false)
+  optInAt      DateTime?
+  source       String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  workspace     Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  leads         Lead[]
+  activities    Activity[]
+  recipients    BroadcastRecipient[]
+  flowRuns      FlowRun[]
+
+  @@unique([workspaceId, phone])
+  @@unique([workspaceId, messengerId])
+  @@unique([workspaceId, instagramId])
+  @@index([workspaceId, createdAt])
+}
+
+model Conversation {
+  id            String             @id @default(cuid())
+  workspaceId   String
+  contactId     String
+  channelId     String
+  status        ConversationStatus @default(OPEN)
+  assigneeId    String?
+  unreadCount   Int                @default(0)
+  lastMessageAt DateTime           @default(now())
+  lastInboundAt DateTime?
+  awaitingSince DateTime?
+  createdAt     DateTime           @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact   Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  channel   Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  assignee  User?     @relation("assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  messages  Message[]
+  flowRuns  FlowRun[]
+
+  @@unique([channelId, contactId])
+  @@index([workspaceId, lastMessageAt])
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  conversationId  String
+  direction       Direction
+  /// text, image, video, audio, document, template, interactive, note, reply, location, unsupported
+  type            String    @default("text")
+  body            String?
+  mediaUrl        String?
+  mediaMime       String?
+  payload         Json?
+  externalId      String?
+  /// queued, sent, delivered, read, failed, received
+  status          String    @default("queued")
+  error           String?
+  senderId        String?
+  isBot           Boolean   @default(false)
+  responseTimeSec Int?
+  broadcastId     String?
+  createdAt       DateTime  @default(now())
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation("sender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([workspaceId, createdAt])
+  @@index([externalId])
+}
+
+model Template {
+  id          String   @id @default(cuid())
+  workspaceId String
+  channelId   String
+  name        String
+  language    String
+  category    String
+  status      String
+  components  Json
+  externalId  String?
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel   Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, name, language])
+}
+
+model Broadcast {
+  id          String    @id @default(cuid())
+  workspaceId String
+  channelId   String
+  templateId  String
+  name        String
+  variables   Json      @default("[]")
+  audience    Json
+  /// draft, scheduled, sending, completed, cancelled, failed
+  status      String    @default("draft")
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel    Channel              @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  recipients BroadcastRecipient[]
+}
+
+model BroadcastRecipient {
+  id          String    @id @default(cuid())
+  broadcastId String
+  contactId   String
+  messageId   String?
+  externalId  String?
+  /// pending, sent, delivered, read, replied, failed
+  status      String    @default("pending")
+  error       String?
+  sentAt      DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  contact   Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, contactId])
+  @@index([externalId])
+}
+
+model Flow {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  active      Boolean  @default(false)
+  /// keyword, new_conversation, lead, manual
+  triggerType String   @default("keyword")
+  keywords    String[] @default([])
+  channelId   String?
+  nodes       Json
+  edges       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runs      FlowRun[]
+}
+
+model FlowRun {
+  id             String   @id @default(cuid())
+  flowId         String
+  workspaceId    String
+  contactId      String
+  conversationId String?
+  currentNodeId  String?
+  /// running, waiting, delayed, completed, failed, cancelled
+  status         String   @default("running")
+  variables      Json     @default("{}")
+  error          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  flow         Flow          @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact      Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, status])
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  workspaceId String
+  contactId   String
+  leadgenId   String?  @unique
+  formId      String?
+  adId        String?
+  pageId      String?
+  /// facebook_lead_ad, api, manual, test
+  source      String   @default("facebook_lead_ad")
+  fields      Json     @default("{}")
+  /// new, contacted, qualified, won, lost
+  status      String   @default("new")
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact   Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}
+
+model Integration {
+  id          String   @id @default(cuid())
+  workspaceId String
+  /// webhook, google_sheets
+  type        String
+  name        String
+  config      Json
+  events      String[]
+  active      Boolean  @default(true)
+  lastError   String?
+  lastRunAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  prefix      String
+  keyHash     String    @unique
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id               String    @id @default(cuid())
+  workspaceId      String    @unique
+  plan             String
+  /// active, cancelled, expired
+  status           String    @default("active")
+  provider         String?
+  providerRef      String?
+  currentPeriodEnd DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  workspaceId String
+  provider    String
+  providerRef String   @unique
+  plan        String
+  amount      Int
+  currency    String
+  createdAt   DateTime @default(now())
+}
+
+model Usage {
+  id           String @id @default(cuid())
+  workspaceId  String
+  /// YYYY-MM
+  period       String
+  messagesSent Int    @default(0)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, period])
+}
+
+model QuickReply {
+  id          String   @id @default(cuid())
+  workspaceId String
+  shortcut    String
+  content     String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, shortcut])
+}
+
+model CustomField {
+  id          String   @id @default(cuid())
+  workspaceId String
+  key         String
+  label       String
+  /// text, number, date
+  type        String   @default("text")
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  workspaceId String
+  contactId   String
+  type        String
+  description String
+  data        Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact   Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, createdAt])
+}
+
+model ContactRequest {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  message   String
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,32 @@
+{
+  "name": "chatnova",
+  "private": true,
+  "version": "1.0.0",
+  "description": "ChatNova - WhatsApp, Messenger and Instagram automation platform for Meta lead ads",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c magenta,cyan \"npm run dev -w @chatnova/api\" \"npm run dev -w @chatnova/web\"",
+    "dev:api": "npm run dev -w @chatnova/api",
+    "dev:web": "npm run dev -w @chatnova/web",
+    "build": "npm run build -w @chatnova/api && npm run build -w @chatnova/web",
+    "build:api": "npm run build -w @chatnova/api",
+    "build:web": "npm run build -w @chatnova/web",
+    "start:api": "npm run start -w @chatnova/api",
+    "start:worker": "npm run start:worker -w @chatnova/api",
+    "start:web": "npm run start -w @chatnova/web",
+    "typecheck": "npm run typecheck -w @chatnova/api && npm run typecheck -w @chatnova/web",
+    "db:generate": "npm run db:generate -w @chatnova/api",
+    "db:migrate": "npm run db:migrate -w @chatnova/api",
+    "db:push": "npm run db:push -w @chatnova/api",
+    "db:seed": "npm run db:seed -w @chatnova/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
